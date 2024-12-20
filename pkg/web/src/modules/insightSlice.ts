@@ -16,6 +16,10 @@ export interface InsightState {
   selectedNamespace?: string | null;
 
   discount: number;
+
+  selectedWorkloadType?: string | null;
+
+  selectedWorkload?: string | null;
 }
 
 export const initialInsightState: InsightState = {
@@ -35,6 +39,10 @@ export const initialInsightState: InsightState = {
   selectedClusterId: '',
 
   selectedNamespace: null,
+
+  selectedWorkloadType: null,
+
+  selectedWorkload: null,
 };
 
 const slice = createSlice({
@@ -61,6 +69,12 @@ const slice = createSlice({
     },
     customRange: (state, action: PayloadAction<InsightState['customRange']>) => {
       state.customRange = action.payload;
+    },
+    selectedWorkloadType: (state, action: PayloadAction<any>) => {
+      state.selectedWorkloadType = action.payload;
+    },
+    selectedWorkload: (state, action: PayloadAction<any>) => {
+      state.selectedWorkload = action.payload;
     },
   },
 });

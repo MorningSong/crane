@@ -35,7 +35,7 @@ func (rr *ReplicasRecommender) CollectData(ctx *framework.RecommendationContext)
 	ctx.MetricNamer = metricNamer
 
 	// get workload cpu usage
-	klog.Infof("%s: CpuQuery %s", ctx.String(), rr.Name(), ctx.MetricNamer.BuildUniqueKey())
+	klog.Infof("%s: %s CpuQuery %s", ctx.String(), rr.Name(), ctx.MetricNamer.BuildUniqueKey())
 	timeNow := time.Now()
 	tsList, err := ctx.DataProviders[providers.PrometheusDataSource].QueryTimeSeries(ctx.MetricNamer, timeNow.Add(-time.Hour*24*7), timeNow, time.Minute)
 	if err != nil {
@@ -44,7 +44,7 @@ func (rr *ReplicasRecommender) CollectData(ctx *framework.RecommendationContext)
 	if len(tsList) != 1 {
 		return fmt.Errorf("%s query historic metrics data is unexpected, List length is %d ", rr.Name(), len(tsList))
 	}
-	ctx.InputValues = tsList
+	ctx.AddInputValue(string(corev1.ResourceCPU), tsList)
 
 	resourceMemory := corev1.ResourceMemory
 	metricNamerMemory := metricnaming.ResourceToWorkloadMetricNamer(ctx.Recommendation.Spec.TargetRef.DeepCopy(), &resourceMemory, labelSelector, caller)
@@ -56,7 +56,7 @@ func (rr *ReplicasRecommender) CollectData(ctx *framework.RecommendationContext)
 	if len(tsListMemory) != 1 {
 		return fmt.Errorf("%s query historic metrics data is unexpected, List length is %d ", rr.Name(), len(tsListMemory))
 	}
-	ctx.InputValues2 = tsListMemory
+	ctx.AddInputValue(string(corev1.ResourceMemory), tsList)
 	return nil
 }
 

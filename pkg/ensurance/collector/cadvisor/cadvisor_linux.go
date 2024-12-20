@@ -78,7 +78,7 @@ func NewCadvisorManager(cgroupDriver string) Manager {
 	sysfs := csysfs.NewRealSysFs()
 	maxHousekeepingConfig := cmanager.HouskeepingConfig{Interval: &maxHousekeepingInterval, AllowDynamic: &allowDynamic}
 
-	m, err := cmanager.New(memCache, sysfs, maxHousekeepingConfig, includedMetrics, http.DefaultClient, []string{"/" + utils.CgroupKubePods}, "")
+	m, err := cmanager.New(memCache, sysfs, maxHousekeepingConfig, includedMetrics, http.DefaultClient, []string{"/" + utils.CgroupKubePods}, nil /* containerEnvMetadataWhiteList */, "" /* perfEventsFile */, time.Duration(0) /*resctrlInterval*/)
 	if err != nil {
 		klog.Errorf("Failed to create cadvisor manager start: %v", err)
 		return nil
@@ -117,6 +117,11 @@ func (c *CadvisorCollector) Collect() (map[string][]common.TimeSeries, error) {
 
 	var stateMap = make(map[string][]common.TimeSeries)
 	for _, pod := range allPods {
+
+		if utils.IsStaticPod(pod) {
+			continue
+		}
+
 		var now = time.Now()
 		containers, err := c.Manager.GetContainerInfoV2(utils.GetCgroupPath(pod, c.Manager.GetCgroupDriver()), cadvisorapiv2.RequestOptions{
 			IdType:    cadvisorapiv2.TypeName,
@@ -158,7 +163,7 @@ func (c *CadvisorCollector) Collect() (map[string][]common.TimeSeries, error) {
 				continue
 			}
 
-			if hasExtMemRes {
+			if hasExtMemRes && v.Stats[0].Memory != nil {
 				extResMemUse += float64(v.Stats[0].Memory.WorkingSet)
 			}
 
@@ -224,12 +229,17 @@ func addSampleToStateMap(metricsName types.MetricName, usage common.TimeSeries, 
 func caculateCPUUsage(info *cadvisorapiv2.ContainerInfo, state *ContainerState) (float64, float64) {
 	if info == nil ||
 		state == nil ||
-		len(info.Stats) == 0 {
+		len(info.Stats) == 0 ||
+		info.Stats[0].Cpu == nil || len(state.stat.Stats) == 0 || state.stat.Stats[0].Cpu == nil {
 		return 0, 0
 	}
 	cpuUsageIncrease := info.Stats[0].Cpu.Usage.Total - state.stat.Stats[0].Cpu.Usage.Total
 	schedRunqueueTimeIncrease := info.Stats[0].Cpu.Schedstat.RunqueueTime - state.stat.Stats[0].Cpu.Schedstat.RunqueueTime
 	timeIncrease := info.Stats[0].Timestamp.UnixNano() - state.stat.Stats[0].Timestamp.UnixNano()
+
+	if timeIncrease <= 0 {
+		return 0, 0
+	}
 
 	cpuUsageSample := float64(cpuUsageIncrease) / float64(timeIncrease)
 	schedRunqueueTime := float64(schedRunqueueTimeIncrease) * 1000 * 1000 / float64(timeIncrease)

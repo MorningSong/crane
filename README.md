@@ -5,7 +5,11 @@
 [![License](https://img.shields.io/github/license/gocrane/crane)](https://www.apache.org/licenses/LICENSE-2.0.html)
 ![GoVersion](https://img.shields.io/github/go-mod/go-version/gocrane/crane)
 
+<div align="center">
+
 <img alt="Crane logo" height="100" src="docs/images/crane.svg" title="Crane" width="200"/>
+
+</div>
 
 ---
 
@@ -15,7 +19,11 @@
 
 Crane is a FinOps Platform for Cloud Resource Analytics and Economics in Kubernetes clusters. The goal is not only help user to manage cloud cost easier but also ensure the quality of applications.
 
+<div align="center">
+
 <img alt="fcs logo" height="200" src="docs/images/Crane-FinOps-Certified-Solution.png" title="FinOps Certified Solution" width="200"/>
+
+</div>
 
 Crane is a [FinOps Certified Solution](https://www.finops.org/certifications/finops-certified-solution/) project of the [FinOps Foundation](https://www.finops.org/).
 
@@ -81,7 +89,7 @@ Crane Agent is a `DaemonSet` that runs in each node.
 ## Getting Started
 
 - [Introduction](https://gocrane.io/docs/getting-started/introduction/)
-- [Quick Start](https://gocrane.io/docs/getting-started/quick-start/)
+- [Quick Start](https://gocrane.io/docs/getting-started/installation/quick-start/)
 - [Tutorials](https://gocrane.io/docs/tutorials/)
 
 ## Documentation
@@ -90,11 +98,14 @@ Full documentation is available on the [Crane website](https://gocrane.io).
 
 ## Community
 
-- Slack(English): [https://gocrane.slack.com](https://join.slack.com/t/gocrane/shared_invite/zt-1oilo15lj-gQ8JLMlfby0XwzON~0ydYg)
+- Slack(English): [https://gocrane.slack.com](https://join.slack.com/t/gocrane/shared_invite/zt-1rirt4xgk-N1ckyMW4acbPLWA8AemhxA)
 
-- Wechat Group (Chinese): Add it and Reply "Crane"，Robot will add you in Wechat group.
+- Wechat Group (Chinese): 
 
+<img alt="Wechat" src="https://github.com/gocrane/crane/assets/6251116/50997b45-187f-4e31-91e2-d679ea2b4bd0" title="Wechat" width="200"/>
 <img alt="Wechat" src="docs/images/wechat.jpeg" title="Wechat" width="200"/>
+Add it and Reply "Crane"，Robot will add you in Wechat group.
+
 
 - Bi-weekly Community Call(APAC, Chinese)
   - [Meeting Link](https://meeting.tencent.com/dm/ri7x8wCCEUut)

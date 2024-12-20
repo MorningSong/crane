@@ -110,11 +110,14 @@ func EvictPodWithGracePeriod(client clientset.Interface, pod *v1.Pod, gracePerio
 	return client.CoreV1().Pods(pod.Namespace).EvictV1beta1(context.Background(), e)
 }
 
-// CalculatePodRequests sum request total from pods
-func CalculatePodRequests(pods []v1.Pod, resource v1.ResourceName) (int64, error) {
+// CalculatePodRequests sum request total from pods. If the containerName is specified, the total amount of requests for that container will be calculated.
+func CalculatePodRequests(pods []v1.Pod, resource v1.ResourceName, containerName string) (int64, error) {
 	var requests int64
 	for _, pod := range pods {
 		for _, c := range pod.Spec.Containers {
+			if containerName != "" && c.Name != containerName {
+				continue
+			}
 			if containerRequest, ok := c.Resources.Requests[resource]; ok {
 				requests += containerRequest.MilliValue()
 			} else {
@@ -312,6 +315,59 @@ func GetNodePods(kubeClient client.Client, nodeName string) ([]corev1.Pod, error
 	return podList.Items, nil
 }
 
+func GetNamespacePods(kubeClient client.Client, namespace string) ([]corev1.Pod, error) {
+	// Get a list of pods for a specified namespace
+	opts := []client.ListOption{
+		client.InNamespace(namespace),
+	}
+	pods := &corev1.PodList{}
+	if err := kubeClient.List(context.Background(), pods, opts...); err != nil {
+		return nil, err
+	}
+	return pods.Items, nil
+}
+
+func GetServicePods(kubeClient client.Client, svc *corev1.Service) ([]corev1.Pod, error) {
+	opts := []client.ListOption{
+		client.InNamespace(svc.Namespace),
+		client.MatchingLabels(svc.Spec.Selector),
+	}
+
+	podList := &corev1.PodList{}
+	err := kubeClient.List(context.TODO(), podList, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return podList.Items, nil
+}
+
+func GetPodOwnerReference(ctx context.Context, kubeClient client.Client, pod *v1.Pod) *metav1.OwnerReference {
+	for _, ownerRef := range pod.OwnerReferences {
+		if ownerRef.Kind == "ReplicaSet" {
+			// ReplicaSet
+			var rs appsv1.ReplicaSet
+			err := kubeClient.Get(ctx, client.ObjectKey{Namespace: pod.Namespace, Name: ownerRef.Name}, &rs)
+			if err != nil {
+				return nil
+			}
+			for _, ownRef := range rs.OwnerReferences {
+				return &ownRef
+			}
+		} else {
+			return &ownerRef
+		}
+	}
+
+	return nil
+}
+
 func IsPodTerminated(pod *corev1.Pod) bool {
 	return pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed
+}
+
+func IsStaticPod(pod *corev1.Pod) bool {
+	_, isStatic := pod.Annotations[kubelettypes.ConfigSourceAnnotationKey]
+
+	return isStatic
 }

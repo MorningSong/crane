@@ -5,7 +5,11 @@
 [![License](https://img.shields.io/github/license/gocrane/crane)](https://www.apache.org/licenses/LICENSE-2.0.html)
 ![GoVersion](https://img.shields.io/github/go-mod/go-version/gocrane/crane)
 
+<div align="center">
+
 <img alt="Crane logo" height="100" src="docs/images/crane.svg" title="Crane" width="200"/>
+
+</div>
 
 ---
 
@@ -15,7 +19,11 @@
 
 Crane 是一个基于 FinOps 的云资源分析与成本优化平台。它的愿景是在保证客户应用运行质量的前提下实现极致的降本。
 
+<div align="center">
+
 <img alt="fcs logo" height="200" src="docs/images/Crane-FinOps-Certified-Solution.png" title="FinOps Certified Solution" width="200"/>
+
+</div>
 
 Crane 是 [FinOps 基金会](https://www.finops.org/)认证的[云优化方案](https://www.finops.org/certifications/finops-certified-solution/)。
 
@@ -81,7 +89,7 @@ Crane Agent 通过 `DaemonSet` 部署在集群的节点上。
 ## 快速开始
 
 - [介绍](https://gocrane.io/zh-cn/docs/getting-started/introduction/)
-- [快速开始](https://gocrane.io/zh-cn/docs/getting-started/quick-start/)
+- [快速开始](https://gocrane.io/zh-cn/docs/getting-started/installation/quick-start/)
 - [教程](https://gocrane.io/zh-cn/docs/tutorials/)
 
 ## 文档
@@ -92,9 +100,13 @@ Crane Agent 通过 `DaemonSet` 部署在集群的节点上。
 
 - Slack(English): [https://gocrane.slack.com](https://join.slack.com/t/gocrane/shared_invite/zt-1k3beos1i-ejN6sV0jx5_MAkKRbl~MFQ)
 
-- 微信群: 添加微信后回复 "Crane"，小助手会定期将您加入微信群。
+- 微信群: 
+
+<img alt="Wechat" src="https://user-images.githubusercontent.com/6251116/226240172-53bae906-3abc-4b04-89d5-eee11c13faaa.png" title="Wechat" width="200"/>
 
 <img alt="Wechat" src="docs/images/wechat.jpeg" title="Wechat" width="200"/>
+
+添加微信后回复 "Crane"，小助手会定期将您加入微信群。
 
 - 社区双周会(APAC, Chinese)
   - [Meeting Link](https://meeting.tencent.com/dm/SjY20wCJHy5F)

@@ -46,6 +46,9 @@ type Options struct {
 	// If unspecified, a default is provided.
 	RecommendationConfigFile string
 
+	// QOSConfigFile is the configuration file for QOS.
+	QOSConfigFile string
+
 	// ServerOptions hold the craned web server options
 	ServerOptions *ServerOptions
 
@@ -58,6 +61,18 @@ type Options struct {
 
 	// OOMRecordMaxNumber is the max number for oom record
 	OOMRecordMaxNumber int
+
+	// TimeSeriesPredictionMaxConcurrentReconciles is the max concurrent reconciles for TimeSeriesPrediction controller
+	TimeSeriesPredictionMaxConcurrentReconciles int
+
+	// CacheUnstructured indicates whether to cache Unstructured objects. When enabled, it will speed up reading Unstructured objects, but will increase memory usage.
+	CacheUnstructured bool
+
+	// MonitorInterval is the interval for recommendation checker
+	MonitorInterval time.Duration
+
+	// OutDateInterval is the checking interval for identify a recommendation is outdated
+	OutDateInterval time.Duration
 }
 
 // NewOptions builds an empty options.
@@ -106,6 +121,7 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.StringVar(&o.DataSourcePromConfig.AdapterConfigMapKey, "prometheus-adapter-configmap-key", "", "prometheus adapter-configmap key")
 	flags.StringVar(&o.DataSourcePromConfig.AdapterConfig, "prometheus-adapter-config", "", "prometheus adapter-config path")
 	flags.StringVar(&o.DataSourcePromConfig.AdapterExtensionLabels, "prometheus-adapter-extension-labels", "", "prometheus adapter extension-labels for expressionQuery")
+	flags.StringVar(&o.DataSourcePromConfig.ExtensionLabels, "extension-labels", "", "extension-labels for every prometheus query")
 	flags.StringVar(&o.DataSourcePromConfig.Auth.Username, "prometheus-auth-username", "", "prometheus auth username")
 	flags.StringVar(&o.DataSourcePromConfig.Auth.Password, "prometheus-auth-password", "", "prometheus auth password")
 	flags.StringVar(&o.DataSourcePromConfig.Auth.BearerToken, "prometheus-auth-bearertoken", "", "prometheus auth bearertoken")
@@ -122,10 +138,14 @@ func (o *Options) AddFlags(flags *pflag.FlagSet) {
 	flags.BoolVar(&o.WebhookConfig.Enabled, "webhook-enabled", true, "whether enable webhook or not, default to true")
 	flags.StringVar(&o.RecommendationConfigFile, "recommendation-config-file", "", "recommendation configuration file")
 	flags.StringVar(&o.RecommendationConfiguration, "recommendation-configuration-file", "/tmp/recommendation-framework/recommendation_configuration.yaml", "recommendation configuration file")
+	flags.StringVar(&o.QOSConfigFile, "qos-config-file", "", "qos configuration file")
 	flags.StringSliceVar(&o.EhpaControllerConfig.PropagationConfig.LabelPrefixes, "ehpa-propagation-label-prefixes", []string{}, "propagate labels whose key has the prefix to hpa")
 	flags.StringSliceVar(&o.EhpaControllerConfig.PropagationConfig.AnnotationPrefixes, "ehpa-propagation-annotation-prefixes", []string{}, "propagate annotations whose key has the prefix to hpa")
 	flags.StringSliceVar(&o.EhpaControllerConfig.PropagationConfig.Labels, "ehpa-propagation-labels", []string{}, "propagate labels whose key is complete matching to hpa")
 	flags.StringSliceVar(&o.EhpaControllerConfig.PropagationConfig.Annotations, "ehpa-propagation-annotations", []string{}, "propagate annotations whose key is complete matching to hpa")
 	flags.IntVar(&o.OOMRecordMaxNumber, "oom-record-max-number", 10000, "Max number for oom records to store in configmap")
-
+	flags.IntVar(&o.TimeSeriesPredictionMaxConcurrentReconciles, "time-series-prediction-max-concurrent-reconciles", 10, "Max concurrent reconciles for TimeSeriesPrediction controller")
+	flags.BoolVar(&o.CacheUnstructured, "cache-unstructured", true, "whether to cache Unstructured objects. When enabled, it will speed up reading Unstructured objects but will increase memory usage")
+	flags.DurationVar(&o.MonitorInterval, "recommendation-monitor-interval", time.Hour, "interval for recommendation checker")
+	flags.DurationVar(&o.OutDateInterval, "recommendation-outdate-interval", 24*time.Hour, "interval for identify a recommendation is outdated")
 }

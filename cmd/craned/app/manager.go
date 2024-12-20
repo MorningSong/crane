@@ -15,9 +15,11 @@ import (
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/scale"
 	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 
@@ -50,6 +52,7 @@ import (
 	"github.com/gocrane/crane/pkg/recommendation"
 	"github.com/gocrane/crane/pkg/server"
 	serverconfig "github.com/gocrane/crane/pkg/server/config"
+	"github.com/gocrane/crane/pkg/utils"
 	"github.com/gocrane/crane/pkg/utils/target"
 	"github.com/gocrane/crane/pkg/webhooks"
 )
@@ -92,7 +95,7 @@ func Run(ctx context.Context, opts *options.Options) error {
 	config.QPS = float32(opts.ApiQps)
 	config.Burst = opts.ApiBurst
 
-	mgr, err := ctrl.NewManager(config, ctrl.Options{
+	ctrlOptions := ctrl.Options{
 		Scheme:                  scheme,
 		MetricsBindAddress:      opts.MetricsAddr,
 		Port:                    9443,
@@ -100,13 +103,23 @@ func Run(ctx context.Context, opts *options.Options) error {
 		LeaderElection:          opts.LeaderElection.LeaderElect,
 		LeaderElectionID:        "craned",
 		LeaderElectionNamespace: known.CraneSystemNamespace,
-	})
+	}
+	if opts.CacheUnstructured {
+		ctrlOptions.NewClient = NewCacheUnstructuredClient
+	}
+
+	mgr, err := ctrl.NewManager(config, ctrlOptions)
 	if err != nil {
 		klog.ErrorS(err, "unable to start crane manager")
 		return err
 	}
 
-	if err := mgr.AddHealthzCheck("ping", healthz.Ping); err != nil {
+	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
+		klog.ErrorS(err, "failed to add health check endpoint")
+		return err
+	}
+
+	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		klog.ErrorS(err, "failed to add health check endpoint")
 		return err
 	}
@@ -131,8 +144,7 @@ func Run(ctx context.Context, opts *options.Options) error {
 		}
 	}()
 
-	recommenderMgr := initRecommenderManager(opts, podOOMRecorder, realtimeDataSources, historyDataSources)
-	initControllers(podOOMRecorder, mgr, opts, predictorMgr, recommenderMgr, historyDataSources[providers.PrometheusDataSource])
+	initControllers(ctx, podOOMRecorder, mgr, opts, predictorMgr, historyDataSources[providers.PrometheusDataSource])
 	// initialize custom collector metrics
 	initMetricCollector(mgr)
 	runAll(ctx, mgr, predictorMgr, dataSourceProviders[providers.PrometheusDataSource], opts)
@@ -140,8 +152,8 @@ func Run(ctx context.Context, opts *options.Options) error {
 	return nil
 }
 
-func initRecommenderManager(opts *options.Options, oomRecorder oom.Recorder, realtimeDataSources map[providers.DataSourceType]providers.RealTime, historyDataSources map[providers.DataSourceType]providers.History) recommendation.RecommenderManager {
-	return recommendation.NewRecommenderManager(opts.RecommendationConfiguration, oomRecorder, realtimeDataSources, historyDataSources)
+func initRecommenderManager(opts *options.Options) recommendation.RecommenderManager {
+	return recommendation.NewRecommenderManager(opts.RecommendationConfiguration)
 }
 
 func initScheme() {
@@ -206,8 +218,9 @@ func initWebhooks(mgr ctrl.Manager, opts *options.Options) {
 		utilfeature.DefaultFeatureGate.Enabled(features.CraneAutoscaling),
 		utilfeature.DefaultFeatureGate.Enabled(features.CraneNodeResource),
 		utilfeature.DefaultFeatureGate.Enabled(features.CraneClusterNodePrediction),
-		utilfeature.DefaultFeatureGate.Enabled(features.CraneAnalysis),
-		utilfeature.DefaultFeatureGate.Enabled(features.CraneTimeSeriesPrediction)); err != nil {
+		utilfeature.DefaultMutableFeatureGate.Enabled(features.CraneAnalysis),
+		utilfeature.DefaultFeatureGate.Enabled(features.CraneTimeSeriesPrediction),
+		utilfeature.DefaultFeatureGate.Enabled(features.QOSInitializer), opts.QOSConfigFile); err != nil {
 		klog.Exit(err, "unable to create webhook", "webhook", "TimeSeriesPrediction")
 	}
 }
@@ -244,6 +257,8 @@ func initDataSources(mgr ctrl.Manager, opts *options.Options) (map[providers.Dat
 			hybridDataSources[providers.PrometheusDataSource] = provider
 			realtimeDataSources[providers.PrometheusDataSource] = provider
 			historyDataSources[providers.PrometheusDataSource] = provider
+
+			utils.SetExtensionLabels(opts.DataSourcePromConfig.ExtensionLabels)
 		}
 	}
 	return realtimeDataSources, historyDataSources, hybridDataSources
@@ -254,7 +269,7 @@ func initPredictorManager(opts *options.Options, realtimeDataSources map[provide
 }
 
 // initControllers setup controllers with manager
-func initControllers(oomRecorder oom.Recorder, mgr ctrl.Manager, opts *options.Options, predictorMgr predictor.Manager, recommenderMgr recommendation.RecommenderManager, historyDataSource providers.History) {
+func initControllers(ctx context.Context, oomRecorder oom.Recorder, mgr ctrl.Manager, opts *options.Options, predictorMgr predictor.Manager, historyDataSource providers.History) {
 	discoveryClientSet, err := discovery.NewDiscoveryClientForConfig(mgr.GetConfig())
 	if err != nil {
 		klog.Exit(err, "Unable to create discover client")
@@ -347,13 +362,15 @@ func initControllers(oomRecorder oom.Recorder, mgr ctrl.Manager, opts *options.O
 			predictorMgr,
 			targetSelectorFetcher,
 		)
-		if err := tspController.SetupWithManager(mgr); err != nil {
+		if err := tspController.SetupWithManager(mgr, opts.TimeSeriesPredictionMaxConcurrentReconciles); err != nil {
 			klog.Exit(err, "unable to create controller", "controller", "TspController")
 		}
 	}
 
 	// TODO(qmhu), change feature gate from analysis to recommendation
 	if utilfeature.DefaultFeatureGate.Enabled(features.CraneAnalysis) {
+		recommenderMgr := initRecommenderManager(opts)
+
 		if err := (&analytics.Controller{
 			Client: mgr.GetClient(),
 			/*Scheme:        mgr.GetScheme(),
@@ -368,11 +385,12 @@ func initControllers(oomRecorder oom.Recorder, mgr ctrl.Manager, opts *options.O
 		}
 
 		if err := (&recommendationctrl.RecommendationController{
-			Client:      mgr.GetClient(),
-			Scheme:      mgr.GetScheme(),
-			RestMapper:  mgr.GetRESTMapper(),
-			ScaleClient: scaleClient,
-			Recorder:    mgr.GetEventRecorderFor("recommendation-controller"),
+			Client:         mgr.GetClient(),
+			Scheme:         mgr.GetScheme(),
+			RestMapper:     mgr.GetRESTMapper(),
+			RecommenderMgr: recommenderMgr,
+			ScaleClient:    scaleClient,
+			Recorder:       mgr.GetEventRecorderFor("recommendation-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			klog.Exit(err, "unable to create controller", "controller", "RecommendationController")
 		}
@@ -383,12 +401,32 @@ func initControllers(oomRecorder oom.Recorder, mgr ctrl.Manager, opts *options.O
 			RestMapper:     mgr.GetRESTMapper(),
 			RecommenderMgr: recommenderMgr,
 			ScaleClient:    scaleClient,
+			OOMRecorder:    oomRecorder,
 			Provider:       historyDataSource,
 			PredictorMgr:   predictorMgr,
 			Recorder:       mgr.GetEventRecorderFor("recommendationrule-controller"),
 		}).SetupWithManager(mgr); err != nil {
 			klog.Exit(err, "unable to create controller", "controller", "RecommendationRuleController")
 		}
+
+		if err := (&recommendationctrl.RecommendationTriggerController{
+			Client:         mgr.GetClient(),
+			RecommenderMgr: recommenderMgr,
+			ScaleClient:    scaleClient,
+			OOMRecorder:    oomRecorder,
+			Provider:       historyDataSource,
+			PredictorMgr:   predictorMgr,
+			Recorder:       mgr.GetEventRecorderFor("recommendation-trigger-controller"),
+		}).SetupWithManager(mgr); err != nil {
+			klog.Exit(err, "unable to create controller", "controller", "RecommendationTriggerController")
+		}
+
+		checker := recommendationctrl.Checker{
+			Client:          mgr.GetClient(),
+			MonitorInterval: opts.MonitorInterval,
+			OutDateInterval: opts.OutDateInterval,
+		}
+		checker.Run(ctx.Done())
 	}
 
 	// CnpController
@@ -448,4 +486,18 @@ func runAll(ctx context.Context, mgr ctrl.Manager, predictorMgr predictor.Manage
 	if err := eg.Wait(); err != nil {
 		klog.Fatal(err)
 	}
+}
+
+func NewCacheUnstructuredClient(cache cache.Cache, config *rest.Config, options client.Options, uncachedObjects ...client.Object) (client.Client, error) {
+	c, err := client.New(config, options)
+	if err != nil {
+		return nil, err
+	}
+
+	return client.NewDelegatingClient(client.NewDelegatingClientInput{
+		CacheReader:       cache,
+		Client:            c,
+		UncachedObjects:   uncachedObjects,
+		CacheUnstructured: true,
+	})
 }

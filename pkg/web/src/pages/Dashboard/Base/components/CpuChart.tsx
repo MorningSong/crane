@@ -1,14 +1,14 @@
 import React from 'react';
 import { Col, Row } from 'tdesign-react';
 import Style from './CpuChart.module.less';
-import SeriesLineChart, { ISeriesLineChart, LineStyle } from '../../../../components/SeriesLineChart';
+import SeriesLineChart, { ISeriesLineChart } from '../../../../components/SeriesLineChart';
 import { useTranslation } from 'react-i18next';
 
 const CpuChart = () => {
   const { t } = useTranslation();
 
   const item: ISeriesLineChart = {
-    title: 'CPU 资源使用',
+    title: t('CPU 资源使用'),
     subTitle: '(Core)',
     datePicker: true,
     step: '1h',
@@ -28,7 +28,7 @@ const CpuChart = () => {
       },
       {
         name: 'usage',
-        query: `sum(label_replace(irate(container_cpu_usage_seconds_total{container!="POD", container!="",image!=""}[1h]), "node", "$1", "instance",  "([0-9.]*)") * on (node) group_left() max(kube_node_labels{label_beta_kubernetes_io_instance_type!~"eklet", label_node_kubernetes_io_instance_type!~"eklet"}) by (node))`,
+        query: `sum(label_replace(irate(container_cpu_usage_seconds_total{id="/"}[5m]), "node", "$1", "instance",  "(^[^:]+)") * on (node) group_left() max(kube_node_labels{label_beta_kubernetes_io_instance_type!~"eklet", label_node_kubernetes_io_instance_type!~"eklet"}) by (node))`,
       },
     ],
   };

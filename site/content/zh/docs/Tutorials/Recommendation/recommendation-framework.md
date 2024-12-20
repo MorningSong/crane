@@ -9,7 +9,7 @@ weight: 10
 ## 推荐概览
 
 Crane 的推荐模块定期的检测发现集群资源配置的问题，并给出优化建议。智能推荐提供了多种 Recommender 来实现面向不同资源的优化推荐。
-如何你想了解 Crane 如何做智能推荐的，或者你想要尝试实现一个自定义的 Recommender，或者修改一个已有的 Recommender 的推荐规则，这篇文章将帮助你了解智能推荐。
+如果你想了解 Crane 如何做智能推荐的，或者你想要尝试实现一个自定义的 Recommender，或者修改一个已有的 Recommender 的推荐规则，这篇文章将帮助你了解智能推荐。
 
 ## 用例
 
@@ -27,7 +27,7 @@ apiVersion: analysis.crane.io/v1alpha1
 kind: RecommendationRule
 metadata:
   name: workloads-rule
- spec:
+spec:
   runInterval: 24h                            # 每24h运行一次
   resourceSelectors:                          # 资源的信息
     - kind: Deployment
@@ -57,44 +57,22 @@ kubectl apply -f workload-rules.yaml
 
 这个例子会对所有 namespace 中的 Deployments 和 StatefulSets 做资源推荐和副本数推荐。
 
-2. 检查 RecommendationRule 的推荐进度。通过 Status.recommendations 观察推荐任务的进度，推荐任务是顺序执行，如果所有任务的 lastStartTime 为最近时间且 message 有值，则表示这一次推荐完成
+2. 检查 RecommendationRule 的推荐进度。通过 Recommendation 的 Annotation 可观察到任务的上次开始时间和运行的结果。
 
 ```shell
-kubectl get rr workloads-rule
+kubectl get recommend workloads-rule-replicas-7djlk -o yaml
 ```
 
 ```yaml
-status:
-  lastUpdateTime: "2022-09-28T10:36:02Z"
-  recommendations:
-  - apiVersion: analysis.crane.io/v1alpha1
-    kind: Recommendation
-    lastStartTime: "2022-09-28T10:36:02Z"
-    message: Success
-    name: workloads-rule-replicas-rckvb
-    namespace: default
-    recommenderRef:
-      name: Replicas
-    targetRef:
-      apiVersion: apps/v1
-      kind: Deployment
-      name: php-apache
-      namespace: default
-    uid: b15cbcd7-6fe2-4ace-9ae8-11cc0a6e69c2
-  - apiVersion: analysis.crane.io/v1alpha1
-    kind: Recommendation
-    lastStartTime: "2022-09-28T10:36:02Z"
-    message: Success
-    name: workloads-rule-resource-pnnxn
-    namespace: default
-    recommenderRef:
-      name: Resource
-    targetRef:
-      apiVersion: apps/v1
-      kind: Deployment
-      name: php-apache
-      namespace: default
-    uid: 8472013a-bda2-4025-b0df-3fdc69c1c910
+apiVersion: analysis.crane.io/v1alpha1
+kind: Recommendation
+metadata:
+  annotations:
+    analysis.crane.io/last-start-time: "2023-07-24 11:43:58"
+    analysis.crane.io/message: 'Failed to run recommendation flow in recommender Replicas:
+      Replicas CalculatePodTemplateRequests cpu failed: missing request for cpu'
+    analysis.crane.io/run-number: "59"
+  creationTimestamp: "2023-06-01T11:37:16Z"
 ```
 
 3. 查看优化建议 `Recommendation`
@@ -128,6 +106,8 @@ patchData=`kubectl get recommend workloads-rule-replicas-rckvb -n default -o jso
 - [**副本数推荐**](/zh-cn/docs/tutorials/recommendation/replicas-recommendation): 通过 HPA 算法分析应用的真实用量推荐更合适的副本数量
 - [**HPA 推荐**](/zh-cn/docs/tutorials/recommendation/hpa-recommendation): 扫描集群中的 Workload，针对适合适合水平弹性的 Workload 推荐 HPA 配置
 - [**闲置节点推荐**](/zh-cn/docs/tutorials/recommendation/idlenode-recommendation): 扫描集群中的闲置节点
+- [**Service 推荐**](/zh-cn/docs/tutorials/recommendation/service-recommendation): 扫描集群中的闲置 Service
+- [**PV 推荐**](/zh-cn/docs/tutorials/recommendation/pv-recommendation): 扫描集群中的闲置 PV
 
 ### Recommender 框架
 
